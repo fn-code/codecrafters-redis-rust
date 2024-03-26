@@ -27,13 +27,21 @@ fn main() {
 
 fn handle_client(mut stream: std::net::TcpStream) {
     let mut buffer = [0; 1024];
-    let n = stream
-        .read(&mut buffer)
-        .expect("failed to read data from client");
-    println!("received data: {:?}", String::from_utf8_lossy(&buffer[..n]));
-    stream
-        .write_all(b"+PONG\r\n")
-        .expect("failed to write data to client");
+    loop {
+        let read_count = stream
+            .read(&mut buffer)
+            .expect("failed to read data from client");
+        println!("received data: {:?}", String::from_utf8_lossy(&buffer[..read_count]));
 
-    stream.flush().expect("failed to flush data to client");
+        if read_count == 0 {
+           break;
+        }
+
+        stream
+            .write_all(b"+PONG\r\n")
+            .expect("failed to write data to client");
+
+        stream.flush().expect("failed to flush data to client");
+    }
+
 }
