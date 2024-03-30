@@ -9,6 +9,7 @@ pub enum Value {
     SimpleString(String),
     BulkString(String),
     Array(Vec<Value>),
+    NullBulkString,
 }
 
 impl Value {
@@ -36,8 +37,6 @@ impl RespHandler {
 
     pub async fn read_value(&mut self) -> Result<Option<Value>> {
         let bytes_read = self.stream.read_buf(&mut self.buffer).await?;
-
-        
 
         if bytes_read == 0 {
             return Ok(None);
