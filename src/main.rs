@@ -82,7 +82,7 @@ async fn handle_conn(stream: TcpStream, db: Arc<Database>) {
 
                         },
                         _ => {
-                            println!("not got sub command px ");
+                           db.set(key, value, None);
                             Value::SimpleString("OK".to_string())
                         }
 
