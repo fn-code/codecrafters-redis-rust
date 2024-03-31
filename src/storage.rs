@@ -32,8 +32,9 @@ impl Database {
     pub fn get(&self, key: &str) -> Option<String> {
         let db = self.db.lock().unwrap();
         if let Some(item) = db.get(key) {
-           if let Some(expaiation) = item.expiration {
-               if item.created_at.elapsed().as_millis() > expaiation as u128 {
+           if let Some(expairation) = item.expiration {
+               let now = Instant::now();
+               if now.duration_since(item.created_at).as_millis() > expairation as u128 {
                    return None;
                }
            }
