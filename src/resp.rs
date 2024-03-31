@@ -17,6 +17,7 @@ impl Value {
         match self {
             Value::SimpleString(s) => format!("+{}\r\n", s),
             Value::BulkString(s) => format!("${}\r\n{}\r\n", s.len(), s),
+            Value::NullBulkString => "$-1\r\n".to_string(),
             _ => panic!("unsupported value type")
         }
     }

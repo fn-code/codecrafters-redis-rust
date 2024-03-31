@@ -1,14 +1,14 @@
 // Uncomment this block to pass the first stage
 
 mod resp;
+mod storage;
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use crate::resp::Value;
 use anyhow::Result;
+use crate::storage::Database;
 
-type Database = Arc<Mutex<HashMap<String, String>>>;
 
 #[tokio::main]
 async fn main() {
@@ -18,7 +18,8 @@ async fn main() {
     // Uncomment this block to pass the first stage
     //
     let listener = TcpListener::bind("0.0.0.0:6379").await.unwrap();
-    let db: Database = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
+
+    let db = Arc::new(storage::Database::new());
 
     loop {
         let stream = listener.accept().await;
@@ -40,7 +41,7 @@ async fn main() {
 }
 
 // *2\r\n$4\r\necho\r\n$3\r\nhey\r\n
-async fn handle_conn(stream: TcpStream, db: Database) {
+async fn handle_conn(stream: TcpStream, db: Arc<Database>) {
     let mut handler = resp::RespHandler::new(stream);
 
     loop {
@@ -54,7 +55,7 @@ async fn handle_conn(stream: TcpStream, db: Database) {
                 "echo" => args.first().unwrap().clone(),
                 "get" => {
                     let key = unpack_bulk_str(args.first().unwrap().clone()).unwrap();
-                    match handle_get(db.clone(), key) {
+                    match db.get(key.as_str()) {
                         Some(value) => Value::BulkString(value),
                         None => Value::NullBulkString
                     }
@@ -62,8 +63,32 @@ async fn handle_conn(stream: TcpStream, db: Database) {
                 "set" => {
                     let key = unpack_bulk_str(args.first().unwrap().clone()).unwrap();
                     let value = unpack_bulk_str(args.get(1).unwrap().clone()).unwrap();
-                    handle_set(db.clone(), key, value);
-                    Value::SimpleString("OK".to_string())
+
+
+                    match args.get(2) {
+                        Some(Value::BulkString(sub_cmd)) if sub_cmd.as_str().to_ascii_lowercase() == "px" => {
+                            if let None = args.get(3) {
+                                println!("not got expiration");
+                                Value::NullBulkString
+                            } else {
+                                let expiration = match args.get(3).unwrap() {
+                                    Value::BulkString(s) => s.parse::<i64>().unwrap(),
+                                    _ => panic!("Invalid expiration")
+                                };
+
+                                db.set(key, value, Some(expiration));
+                                Value::SimpleString("OK".to_string())
+                            }
+
+                        },
+                        _ => {
+                            println!("not got sub command px ");
+                            Value::SimpleString("OK".to_string())
+                        }
+
+                    }
+
+
                 }
                 c => panic!("Unsupported command: {}", c)
             }
@@ -77,15 +102,6 @@ async fn handle_conn(stream: TcpStream, db: Database) {
 
 }
 
-fn handle_set(db:Database, key: String, value: String) {
-    let mut db = db.lock().unwrap();
-    db.insert(key, value);
-}
-
-fn handle_get(db:Database, key: String) -> Option<String> {
-    let db = db.lock().unwrap();
-    db.get(&key).cloned()
-}
 
 fn extract_command(value: Value) -> Result<(String, Vec<Value>)> {
     match value {
