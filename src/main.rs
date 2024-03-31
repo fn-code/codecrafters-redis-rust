@@ -3,6 +3,7 @@
 mod resp;
 mod storage;
 
+
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use crate::resp::Value;
@@ -10,17 +11,47 @@ use anyhow::Result;
 use crate::storage::Database;
 
 
+
+
+
 #[tokio::main]
 async fn main() {
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    println!("Logs from your program will appear here!");
-
-    // Uncomment this block to pass the first stage
-    //
-    let listener = TcpListener::bind("0.0.0.0:6379").await.unwrap();
 
     let db = Arc::new(storage::Database::new());
+    let mut host = String::from("0.0.0.0");
+    let mut port = 6379;
 
+    let mut args = std::env::args().into_iter();
+
+
+
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--host" => {
+                let host_args = args.next().expect("missing host argument");
+                host = host_args;
+
+            }
+
+            "--port" => {
+                port = args
+                    .next()
+                    .expect("missing port argument")
+                    .parse::<u16>()
+                    .expect("invalid port argument");
+            }
+            _ => ()
+        }
+    }
+
+
+    println!("Starting server on {host}:{port}");
+    run_server(db, host, port).await;
+}
+
+async fn run_server(db: Arc<Database>, host: String, port: u16) {
+    println!("Trying Listening on {host}:{port}");
+    let listener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
     loop {
         let stream = listener.accept().await;
         let db = db.clone();
@@ -28,10 +59,8 @@ async fn main() {
             Ok((stream, _)) => {
                 println!("accepted new connection");
                 tokio::spawn(async move {
-
                     handle_conn(stream, db).await;
                 });
-
             }
             Err(e) => {
                 println!("error: {}", e);
