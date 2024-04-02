@@ -4,6 +4,7 @@ mod resp;
 mod storage;
 
 
+use std::cell::RefCell;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use crate::resp::Value;
@@ -11,30 +12,50 @@ use anyhow::Result;
 use crate::storage::Database;
 
 
+pub enum ServerRole {
+    Master,
+    Slave
+}
+impl ServerRole {
+    pub fn to_string(&self) -> String {
+        match self {
+            ServerRole::Master => "master".to_string(),
+            ServerRole::Slave => "slave".to_string()
+        }
+    }
+}
 
+pub struct Server {
+    pub role: ServerRole,
+    pub port: u16,
+    pub host: String,
 
+}
 
 #[tokio::main]
 async fn main() {
 
     let db = Arc::new(storage::Database::new());
-    let mut host = String::from("0.0.0.0");
-    let mut port = 6379;
+
+    let server = Arc::new(RefCell::new(Server {
+        role: ServerRole::Master,
+        port: 6379,
+        host:  String::from("0.0.0.0"),
+    }));
+
+
 
     let mut args = std::env::args().into_iter();
-
-
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--host" => {
                 let host_args = args.next().expect("missing host argument");
-                host = host_args;
-
+                server.borrow_mut().host = host_args;
             }
 
             "--port" => {
-                port = args
+                server.borrow_mut().port = args
                     .next()
                     .expect("missing port argument")
                     .parse::<u16>()
@@ -45,16 +66,20 @@ async fn main() {
     }
 
 
-    println!("Starting server on {host}:{port}");
-    run_server(db, host, port).await;
+
+    println!("Starting server on {}:{}", server.borrow().host, server.borrow().port);
+
+    run_server(&db, &server).await;
 }
 
-async fn run_server(db: Arc<Database>, host: String, port: u16) {
-    println!("Trying Listening on {host}:{port}");
-    let listener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
+async fn run_server(db: &Arc<Database>, srv: &Arc<RefCell<Server>>) {
+
+    println!("Trying Listening on {}:{}", srv.borrow().host, srv.borrow().port);
+    let listener = TcpListener::bind(format!("{}:{}", srv.borrow().host, srv.borrow().port)).await.unwrap();
     loop {
         let stream = listener.accept().await;
-        let db = db.clone();
+        let db = Arc::clone(db);
+        // let _server = Arc::clone(srv);
         match stream {
             Ok((stream, _)) => {
                 println!("accepted new connection");
@@ -117,6 +142,22 @@ async fn handle_conn(stream: TcpStream, db: Arc<Database>) {
 
                     }
 
+
+                }
+                "info" => {
+
+                    if let Some(command_value) = args.first() {
+                        let command_str = unpack_bulk_str(command_value.clone()).unwrap();
+
+                        if command_str.to_lowercase() == "replication" {
+                            Value::BulkString(format!("role:{}", "master"))
+                        } else {
+                            Value::NullBulkString
+                        }
+
+                    } else {
+                        Value::NullBulkString
+                    }
 
                 }
                 c => panic!("Unsupported command: {}", c)
