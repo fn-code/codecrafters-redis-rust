@@ -104,7 +104,7 @@ async fn handle_conn(stream: TcpStream, db: Arc<Database>) {
 
         let response = if let Some(value) = value {
             let (command, args) = extract_command(value).unwrap();
-            match command.as_str() {
+            match command.to_lowercase().as_str() {
                 "ping" => Value::SimpleString("PONG".to_string()),
                 "echo" => args.first().unwrap().clone(),
                 "get" => {
