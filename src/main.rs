@@ -150,7 +150,7 @@ async fn handle_conn(stream: TcpStream, db: Arc<Database>) {
                         let command_str = unpack_bulk_str(command_value.clone()).unwrap();
 
                         if command_str.to_lowercase() == "replication" {
-                            Value::BulkString(format!("role:{}", "master"))
+                            Value::BulkString("role:master".to_string())
                         } else {
                             Value::NullBulkString
                         }
