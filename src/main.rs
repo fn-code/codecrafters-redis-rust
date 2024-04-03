@@ -4,8 +4,7 @@ mod resp;
 mod storage;
 
 
-use std::cell::RefCell;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::net::{TcpListener, TcpStream};
 use crate::resp::Value;
 use anyhow::Result;
@@ -29,6 +28,8 @@ pub struct Server {
     pub role: ServerRole,
     pub port: u16,
     pub host: String,
+    pub master_host: String,
+    pub master_port: u16,
 
 }
 
@@ -37,54 +38,79 @@ async fn main() {
 
     let db = Arc::new(storage::Database::new());
 
-    let server = Arc::new(RefCell::new(Server {
+    let server = Arc::new(RwLock::new(Server {
         role: ServerRole::Master,
         port: 6379,
         host:  String::from("0.0.0.0"),
+        master_host: "".to_string(),
+        master_port: 0,
     }));
+
 
 
 
     let mut args = std::env::args().into_iter();
 
+    
+
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--host" => {
                 let host_args = args.next().expect("missing host argument");
-                server.borrow_mut().host = host_args;
+                let mut srv_write = server.write().unwrap();
+                srv_write.host = host_args;
             }
 
             "--port" => {
-                server.borrow_mut().port = args
+
+                let mut srv_write = server.write().unwrap();
+                srv_write.port = args
                     .next()
                     .expect("missing port argument")
                     .parse::<u16>()
                     .expect("invalid port argument");
             }
+            "--replicaof" => {
+                let master_host = args.next().expect("missing master host argument");
+                let master_port = args
+                    .next()
+                    .expect("missing master port argument")
+                    .parse::<u16>()
+                    .expect("invalid master port argument");
+
+
+                let mut srv_write = server.write().unwrap();
+                srv_write.role = ServerRole::Slave;
+                srv_write.master_host = master_host;
+                srv_write.master_port = master_port;
+
+            }
             _ => ()
         }
     }
 
+    
 
-
-    println!("Starting server on {}:{}", server.borrow().host, server.borrow().port);
-
+    let srv_read = server.read().unwrap();
+    println!("Starting server on {}:{}", srv_read.host, srv_read.port);
     run_server(&db, &server).await;
+    
 }
 
-async fn run_server(db: &Arc<Database>, srv: &Arc<RefCell<Server>>) {
+async fn run_server(db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
 
-    println!("Trying Listening on {}:{}", srv.borrow().host, srv.borrow().port);
-    let listener = TcpListener::bind(format!("{}:{}", srv.borrow().host, srv.borrow().port)).await.unwrap();
+    let srv_read = srv.read().unwrap();
+    println!("Trying Listening on {}:{}",srv_read.host, srv_read.port);
+    let listener = TcpListener::bind(format!("{}:{}",srv_read.host, srv_read.port)).await.unwrap();
     loop {
         let stream = listener.accept().await;
         let db = Arc::clone(db);
-        // let _server = Arc::clone(srv);
+        let srv = Arc::clone(srv);
         match stream {
             Ok((stream, _)) => {
                 println!("accepted new connection");
                 tokio::spawn(async move {
-                    handle_conn(stream, db).await;
+                    handle_conn(stream, &db, &srv).await;
                 });
             }
             Err(e) => {
@@ -95,7 +121,7 @@ async fn run_server(db: &Arc<Database>, srv: &Arc<RefCell<Server>>) {
 }
 
 // *2\r\n$4\r\necho\r\n$3\r\nhey\r\n
-async fn handle_conn(stream: TcpStream, db: Arc<Database>) {
+async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
     let mut handler = resp::RespHandler::new(stream);
 
     loop {
@@ -150,7 +176,8 @@ async fn handle_conn(stream: TcpStream, db: Arc<Database>) {
                         let command_str = unpack_bulk_str(command_value.clone()).unwrap();
 
                         if command_str.to_lowercase() == "replication" {
-                            Value::BulkString("role:master".to_string())
+
+                            Value::BulkString(format!("role:{}", srv.read().unwrap().role.to_string()))
                         } else {
                             Value::NullBulkString
                         }
