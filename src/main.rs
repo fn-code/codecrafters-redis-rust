@@ -30,6 +30,8 @@ pub struct Server {
     pub host: String,
     pub master_host: String,
     pub master_port: u16,
+    pub master_replid: String,
+    pub master_repl_offset: usize,
 
 }
 
@@ -44,6 +46,8 @@ async fn main() {
         host:  String::from("0.0.0.0"),
         master_host: "".to_string(),
         master_port: 0,
+        master_replid: "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb".to_string(),
+        master_repl_offset: 0
     }));
 
 
@@ -177,7 +181,11 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
 
                         if command_str.to_lowercase() == "replication" {
 
-                            Value::BulkString(format!("role:{}", srv.read().unwrap().role.to_string()))
+                            Value::BulkString(format!("role:{}\nmaster_replid:{}\nmaster_repl_offset:{}",
+                                                      srv.read().unwrap().role.to_string(),
+                                                      srv.read().unwrap().master_replid,
+                                                      srv.read().unwrap().master_repl_offset
+                            ))
                         } else {
                             Value::NullBulkString
                         }
