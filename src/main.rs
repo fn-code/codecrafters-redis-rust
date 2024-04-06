@@ -4,17 +4,23 @@ mod resp;
 mod storage;
 
 
+use std::cmp::PartialEq;
+use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener, TcpSocket, TcpStream};
 use crate::resp::Value;
 use anyhow::Result;
+use tokio::io::AsyncWriteExt;
 use crate::storage::Database;
 
 
+#[derive(PartialEq)]
 pub enum ServerRole {
     Master,
     Slave
 }
+
 impl ServerRole {
     pub fn to_string(&self) -> String {
         match self {
@@ -23,6 +29,8 @@ impl ServerRole {
         }
     }
 }
+
+
 
 pub struct Server {
     pub role: ServerRole,
@@ -50,12 +58,7 @@ async fn main() {
         master_repl_offset: 0
     }));
 
-
-
-
     let mut args = std::env::args().into_iter();
-
-    
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -101,9 +104,33 @@ async fn main() {
     
 }
 
+async fn connect_to_master(srv: &Arc<RwLock<Server>>)  {
+
+    let srv_read = srv.read().unwrap();
+    println!("Connecting to master at {}:{}", srv_read.master_host,srv_read.master_port);
+    let ip4_addr = SocketAddr::from_str(format!("{}:{}",srv_read.master_host,srv_read.master_port).as_str()).unwrap();
+    let client = TcpSocket::new_v4().unwrap();
+    let mut stream = client.connect(ip4_addr).await.unwrap();
+
+    stream.write(Value::Array(vec![
+        Value::BulkString("ping".to_string()),
+    ]).serialize().as_bytes()).await.unwrap();
+
+}
+
+
+
 async fn run_server(db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
 
     let srv_read = srv.read().unwrap();
+
+
+    // if the app role is slave, connect to the master
+    if srv_read.role == ServerRole::Slave {
+        println!("Trying to connect to master node {}:{}", srv_read.master_host, srv_read.master_port);
+        connect_to_master(srv).await;
+    }
+
     println!("Trying Listening on {}:{}",srv_read.host, srv_read.port);
     let listener = TcpListener::bind(format!("{}:{}",srv_read.host, srv_read.port)).await.unwrap();
     loop {
