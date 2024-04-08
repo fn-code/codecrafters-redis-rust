@@ -168,10 +168,8 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     handler.write_value(Value::Array(vec![
         Value::BulkString("ping".to_string()),
     ])).await.unwrap();
-    handler.flush().await.unwrap();
 
     let resp = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
-
 
 
     match resp {
@@ -197,8 +195,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     ]);
 
 
-    handler.write_all_value(port_conf).await.unwrap();
-    handler.flush().await.unwrap();
+    handler.write_value(port_conf).await.unwrap();
 
 
     let resp = timeout(time::Duration::from_secs(10), handler.read_value())
@@ -227,8 +224,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
         Value::BulkString("psync2".to_string()),
     ]);
 
-    handler.write_all_value(capa_conf).await.unwrap();
-    handler.flush().await.unwrap();
+    handler.write_value(capa_conf).await.unwrap();
 
     let resp = timeout(time::Duration::from_secs(10), handler.read_value())
         .await.unwrap().unwrap();
