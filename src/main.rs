@@ -168,7 +168,8 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
         Value::BulkString("ping".to_string()),
     ])).await.unwrap();
 
-    let resp = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
+    // let resp = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
+    let resp = handler.read_value().await.unwrap();
 
 
     match resp {
@@ -197,8 +198,8 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     handler.write_value(port_conf).await.unwrap();
 
 
-    let resp_conf_port = timeout(time::Duration::from_secs(10), handler.read_value())
-        .await.unwrap().unwrap();
+    // let resp_conf_port = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
+    let resp_conf_port = handler.read_value().await.unwrap();
 
 
     match resp_conf_port {
@@ -225,8 +226,8 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
 
     handler.write_value(capa_conf).await.unwrap();
 
-    let resp_conf_capa = timeout(time::Duration::from_secs(10), handler.read_value())
-        .await.unwrap().unwrap();
+    // let resp_conf_capa = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
+    let resp_conf_capa = handler.read_value().await.unwrap();
 
     match resp_conf_capa {
         Some(value) => {
