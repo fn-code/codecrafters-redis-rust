@@ -122,7 +122,6 @@ async fn run_server(db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
     if srv_read.role == ServerRole::Slave {
         println!("Trying to connect to master node {}:{}", srv_read.master_host, srv_read.master_port);
         connect_to_master(srv).await;
-        return;
     }
 
     println!("Trying Listening on {}:{}",srv_read.host, srv_read.port);
