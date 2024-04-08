@@ -169,7 +169,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     ])).await.unwrap();
 
 
-    let resp = timeout(time::Duration::from_secs(5), handler.read_value()).await.unwrap().unwrap();
+    let resp = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
 
 
 
@@ -197,7 +197,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     handler.write_all_value(port_conf).await.unwrap();
 
 
-    let resp = timeout(time::Duration::from_secs(5), handler.read_value())
+    let resp = timeout(time::Duration::from_secs(10), handler.read_value())
         .await.unwrap().unwrap();
 
 
@@ -223,7 +223,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
 
     handler.write_all_value(capa_conf).await.unwrap();
 
-    let resp = timeout(time::Duration::from_secs(5), handler.read_value())
+    let resp = timeout(time::Duration::from_secs(10), handler.read_value())
         .await.unwrap().unwrap();
 
     match resp {
@@ -241,7 +241,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     };
 
     loop {
-        
+
     }
 
 
