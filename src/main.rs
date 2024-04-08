@@ -182,7 +182,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
             }
         }
         None => {
-            println!("Slave received null value");
+            println!("Slave received null value, should got pong");
             return;
         }
     };
@@ -210,7 +210,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
             }
         }
         None => {
-            println!("Slave received null value");
+            println!("Slave received null value should got ok");
             return;
         }
     };
@@ -235,7 +235,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
             }
         }
         None => {
-            println!("Slave received null value");
+            println!("Slave received null value should got ok");
             return;
         }
     };
