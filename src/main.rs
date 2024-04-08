@@ -198,11 +198,11 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     handler.write_value(port_conf).await.unwrap();
 
 
-    let resp = timeout(time::Duration::from_secs(10), handler.read_value())
+    let resp_conf_port = timeout(time::Duration::from_secs(10), handler.read_value())
         .await.unwrap().unwrap();
 
 
-    match resp {
+    match resp_conf_port {
         Some(value) => {
             let (command, _ ) = extract_command(value).unwrap();
             if command.to_lowercase() != "ok" {
@@ -226,10 +226,10 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
 
     handler.write_value(capa_conf).await.unwrap();
 
-    let resp = timeout(time::Duration::from_secs(10), handler.read_value())
+    let resp_conf_capa = timeout(time::Duration::from_secs(10), handler.read_value())
         .await.unwrap().unwrap();
 
-    match resp {
+    match resp_conf_capa {
         Some(value) => {
             let (command, _ ) = extract_command(value).unwrap();
             if command.to_lowercase() != "ok" {
