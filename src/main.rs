@@ -13,6 +13,7 @@ use crate::resp::{Value};
 use anyhow::{Result};
 use crate::storage::Database;
 use std::{time};
+use std::io::Write;
 use tokio::time::timeout;
 
 
@@ -167,7 +168,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     handler.write_value(Value::Array(vec![
         Value::BulkString("ping".to_string()),
     ])).await.unwrap();
-
+    handler.flush().await.unwrap();
 
     let resp = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
 
@@ -195,6 +196,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
 
 
     handler.write_all_value(port_conf).await.unwrap();
+    handler.flush().await.unwrap();
 
 
     let resp = timeout(time::Duration::from_secs(10), handler.read_value())
@@ -208,6 +210,8 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
                 println!("Slave did not receive ok from master");
                 return;
             }
+
+            println!("Slave received ok from master")
         }
         None => {
             println!("Slave received null value should got ok");
@@ -222,6 +226,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     ]);
 
     handler.write_all_value(capa_conf).await.unwrap();
+    handler.flush().await.unwrap();
 
     let resp = timeout(time::Duration::from_secs(10), handler.read_value())
         .await.unwrap().unwrap();
@@ -233,6 +238,8 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
                 println!("Slave did not receive ok from master");
                 return;
             }
+
+            println!("Slave received ok from master")
         }
         None => {
             println!("Slave received null value should got ok");

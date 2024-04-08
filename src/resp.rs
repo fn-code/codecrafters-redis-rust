@@ -62,6 +62,11 @@ impl RespHandler {
         self.stream.write_all(value.serialize().as_bytes()).await?;
         Ok(())
     }
+
+    pub async fn flush(&mut self) -> Result<()> {
+        self.stream.flush().await?;
+        Ok(())
+    }
 }
 
 fn parse_message(buffer: BytesMut) -> Result<(Value, usize)> {
