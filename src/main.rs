@@ -13,7 +13,6 @@ use crate::resp::{Value};
 use anyhow::{Result};
 use crate::storage::Database;
 use std::{time};
-use std::io::Write;
 use tokio::time::timeout;
 
 
@@ -343,7 +342,7 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
            break;
         };
 
-        println!("Sending value {:?}", response);
+        println!("Master Sending value {:?}", response);
         handler.write_value(response).await.unwrap();
     }
 
