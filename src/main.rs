@@ -244,11 +244,6 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
         }
     };
 
-    loop {
-
-    }
-
-
 
 }
 
