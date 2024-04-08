@@ -190,7 +190,7 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     let port_conf = Value::Array(vec![
         Value::BulkString("replconf".to_string()),
         Value::BulkString("listening-port".to_string()),
-        Value::BulkString(srv_read.master_port.to_string()),
+        Value::BulkString(srv_read.port.to_string()),
     ]);
 
 
