@@ -181,6 +181,8 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
                 println!("Slave did not receive pong from master");
                 return;
             }
+
+            println!("Slave received pong from master")
         }
         None => {
             println!("Slave received null value, should got pong");
