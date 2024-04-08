@@ -9,10 +9,11 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use tokio::net::{TcpListener, TcpStream};
-use crate::resp::Value;
-use anyhow::Result;
-use tokio::io::AsyncWriteExt;
+use crate::resp::{Value};
+use anyhow::{Result};
 use crate::storage::Database;
+use std::{time};
+use tokio::time::timeout;
 
 
 #[derive(PartialEq)]
@@ -108,18 +109,7 @@ async fn main() {
     
 }
 
-async fn connect_to_master(srv: &Arc<RwLock<Server>>)  {
 
-    let srv_read = srv.read().unwrap();
-    println!("Connecting to master at {}:{}", srv_read.master_host,srv_read.master_port);
-    let ip4_addr = SocketAddr::from_str(format!("{}:{}",srv_read.master_host,srv_read.master_port).as_str()).unwrap();
-    let mut stream  = TcpStream::connect(ip4_addr).await.unwrap();
-
-    stream.write(Value::Array(vec![
-        Value::BulkString("ping".to_string()),
-    ]).serialize().as_bytes()).await.unwrap();
-
-}
 
 
 
@@ -132,6 +122,7 @@ async fn run_server(db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
     if srv_read.role == ServerRole::Slave {
         println!("Trying to connect to master node {}:{}", srv_read.master_host, srv_read.master_port);
         connect_to_master(srv).await;
+        return;
     }
 
     println!("Trying Listening on {}:{}",srv_read.host, srv_read.port);
@@ -154,13 +145,121 @@ async fn run_server(db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
     }
 }
 
+
+async fn connect_to_master(server: &Arc<RwLock<Server>>)  {
+
+    let srv_read = server.read().unwrap();
+    println!("Connecting to master at {}:{}", srv_read.master_host,srv_read.master_port);
+    let ip4_addr = SocketAddr::from_str(format!("{}:{}",srv_read.master_host,srv_read.master_port).as_str()).unwrap();
+    let stream  = TcpStream::connect(ip4_addr).await.unwrap();
+
+
+
+    handle_slave_con(stream, &server).await;
+}
+
+async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
+    let srv_read = server.read().unwrap();
+    let mut handler = resp::RespHandler::new(stream);
+
+
+
+    handler.write_value(Value::Array(vec![
+        Value::BulkString("ping".to_string()),
+    ])).await.unwrap();
+
+
+    let resp = timeout(time::Duration::from_secs(5), handler.read_value()).await.unwrap().unwrap();
+
+
+
+    match resp {
+        Some(value) => {
+            let (command, _ ) = extract_command(value).unwrap();
+            if command.to_lowercase() != "pong" {
+                println!("Slave did not receive pong from master");
+                return;
+            }
+        }
+        None => {
+            println!("Slave received null value");
+            return;
+        }
+    };
+
+    let port_conf = Value::Array(vec![
+        Value::BulkString("replconf".to_string()),
+        Value::BulkString("listening-port".to_string()),
+        Value::BulkString(srv_read.master_port.to_string()),
+    ]);
+
+
+    handler.write_all_value(port_conf).await.unwrap();
+
+
+    let resp = timeout(time::Duration::from_secs(5), handler.read_value())
+        .await.unwrap().unwrap();
+
+
+    match resp {
+        Some(value) => {
+            let (command, _ ) = extract_command(value).unwrap();
+            if command.to_lowercase() != "ok" {
+                println!("Slave did not receive ok from master");
+                return;
+            }
+        }
+        None => {
+            println!("Slave received null value");
+            return;
+        }
+    };
+
+    let capa_conf = Value::Array(vec![
+        Value::BulkString("replconf".to_string()),
+        Value::BulkString("capa".to_string()),
+        Value::BulkString("psync2".to_string()),
+    ]);
+
+    handler.write_all_value(capa_conf).await.unwrap();
+
+    let resp = timeout(time::Duration::from_secs(5), handler.read_value())
+        .await.unwrap().unwrap();
+
+    match resp {
+        Some(value) => {
+            let (command, _ ) = extract_command(value).unwrap();
+            if command.to_lowercase() != "ok" {
+                println!("Slave did not receive ok from master");
+                return;
+            }
+        }
+        None => {
+            println!("Slave received null value");
+            return;
+        }
+    };
+
+
+
+}
+
+
+
 // *2\r\n$4\r\necho\r\n$3\r\nhey\r\n
 async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
     let mut handler = resp::RespHandler::new(stream);
 
     loop {
         let value = handler.read_value().await.unwrap();
-        println!("Got value: {:?}", value);
+
+        if value.is_none() {
+            println!("Master Received null value");
+            break;
+        }
+
+        println!("Master Got value: {:?}", value);
+
 
         let response = if let Some(value) = value {
             let (command, args) = extract_command(value).unwrap();
@@ -225,10 +324,14 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
                     }
 
                 }
+                "replconf" => {
+                    Value::SimpleString("OK".to_string())
+                }
                 c => panic!("Unsupported command: {}", c)
             }
         } else {
-            break;
+            println!("Master Received null value");
+           break;
         };
 
         println!("Sending value {:?}", response);
@@ -245,6 +348,9 @@ fn extract_command(value: Value) -> Result<(String, Vec<Value>)> {
                 unpack_bulk_str(a.first().unwrap().clone())?,
                 a.into_iter().skip(1).collect(),
                 ))
+        }
+        Value::SimpleString(s) => {
+            Ok((s, vec![]))
         }
         _ => Err(anyhow::anyhow!("Not an array"))
     }
