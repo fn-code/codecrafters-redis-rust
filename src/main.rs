@@ -244,6 +244,31 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
         }
     };
 
+    let psync_conf = Value::Array(vec![
+        Value::BulkString("psync".to_string()),
+        Value::BulkString("?".to_string()),
+        Value::BulkString("-1".to_string()),
+    ]);
+
+    handler.write_value(psync_conf).await.unwrap();
+
+    let resp_conf_psync = timeout(time::Duration::from_secs(10), handler.read_value())
+        .await
+        .unwrap()
+        .unwrap();
+
+    match resp_conf_psync {
+        Some(value) => {
+            let (command, _ ) = extract_command(value).unwrap();
+
+            println!("Slave received {} from master", command);
+        }
+        None => {
+            println!("Slave received null value should got ok");
+            return;
+        }
+    };
+
 
 }
 
@@ -329,6 +354,9 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
                 }
                 "replconf" => {
                     Value::SimpleString("OK".to_string())
+                }
+                "psync" => {
+                    Value::SimpleString(format!("+FULLRESYNC {} 0", srv.read().unwrap().master_replid))
                 }
                 c => panic!("Unsupported command: {}", c)
             }
