@@ -251,7 +251,6 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     ]);
 
     handler.write_value(psync_conf).await.unwrap();
-
     let resp_conf_psync = timeout(time::Duration::from_secs(10), handler.read_value())
         .await
         .unwrap()
