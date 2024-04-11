@@ -260,7 +260,6 @@ async fn handle_slave_con(stream: TcpStream, server: &Arc<RwLock<Server>>) {
     match resp_conf_psync {
         Some(value) => {
             let (command, _ ) = extract_command(value).unwrap();
-
             println!("Slave received {} from master", command);
         }
         None => {
