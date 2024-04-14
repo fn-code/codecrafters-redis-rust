@@ -8,7 +8,6 @@ use anyhow::Result;
 pub enum Value {
     SimpleString(String),
     BulkString(String),
-    RawString(String),
     Array(Vec<Value>),
     NullBulkString,
 }
@@ -19,7 +18,6 @@ impl Value {
             Value::SimpleString(s) => format!("+{}\r\n", s),
             Value::BulkString(s) => format!("${}\r\n{}\r\n", s.len(), s),
             Value::NullBulkString => "$-1\r\n".to_string(),
-            Value::RawString(s) => s,
             Value::Array(v) => {
                 let mut serialized = format!("*{}\r\n", v.len());
                 for item in v {
@@ -58,6 +56,11 @@ impl RespHandler {
 
     pub async fn write_value(&mut self, value: Value) -> Result<()> {
         self.stream.write(value.serialize().as_bytes()).await?;
+        Ok(())
+    }
+
+    pub async fn write(&mut self,  buffer: &[u8]) -> Result<()> {
+        self.stream.write(&buffer).await?;
         Ok(())
     }
 }
