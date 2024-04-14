@@ -304,7 +304,7 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
                     let key = unpack_bulk_str(args.first().unwrap().clone()).unwrap();
                     let response = match db.get(key.as_str()) {
                         Some(value) => Value::BulkString(value),
-                        (None) => Value::NullBulkString
+                        None => Value::NullBulkString
                     };
 
                     println!("Master Sending value {:?}", response);
@@ -379,8 +379,8 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
                     // SEND THE RDB FILE
                     let empty_rdb_hex = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
-                    let empty_rdb_bytes = hex::decode(empty_rdb_hex)?;
-                    let empty_rdb_str = String::from_utf8(empty_rdb_bytes)?;
+                    let empty_rdb_bytes = hex::decode(empty_rdb_hex).unwrap();
+                    let empty_rdb_str = String::from_utf8(empty_rdb_bytes.clone()).unwrap();
 
                     let message = format!("${}\r\n{}", empty_rdb_bytes.len(), empty_rdb_str);
                     handler.write_value(Value::RawString(message)).await.unwrap();
