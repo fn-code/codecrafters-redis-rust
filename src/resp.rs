@@ -8,6 +8,7 @@ use anyhow::Result;
 pub enum Value {
     SimpleString(String),
     BulkString(String),
+    RawString(String),
     Array(Vec<Value>),
     NullBulkString,
 }
@@ -18,6 +19,7 @@ impl Value {
             Value::SimpleString(s) => format!("+{}\r\n", s),
             Value::BulkString(s) => format!("${}\r\n{}\r\n", s.len(), s),
             Value::NullBulkString => "$-1\r\n".to_string(),
+            Value::RawString(s) => s,
             Value::Array(v) => {
                 let mut serialized = format!("*{}\r\n", v.len());
                 for item in v {

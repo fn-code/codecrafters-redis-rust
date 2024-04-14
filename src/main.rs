@@ -3,7 +3,6 @@
 mod resp;
 mod storage;
 
-
 use std::cmp::PartialEq;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -287,24 +286,37 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
         println!("Master Got value: {:?}", value);
 
 
-        let response = if let Some(value) = value {
+        if let Some(value) = value {
             let (command, args) = extract_command(value).unwrap();
             match command.to_lowercase().as_str() {
-                "ping" => Value::SimpleString("PONG".to_string()),
-                "echo" => args.first().unwrap().clone(),
+                "ping" => {
+                    let response = Value::SimpleString("PONG".to_string());
+
+                    println!("Master Sending value {:?}", response);
+                    handler.write_value(response).await.unwrap();
+                },
+                "echo" => {
+                    let response = args.first().unwrap().clone();
+                    println!("Master Sending value {:?}", response);
+                    handler.write_value(response).await.unwrap();
+                },
                 "get" => {
                     let key = unpack_bulk_str(args.first().unwrap().clone()).unwrap();
-                    match db.get(key.as_str()) {
+                    let response = match db.get(key.as_str()) {
                         Some(value) => Value::BulkString(value),
-                        None => Value::NullBulkString
-                    }
+                        (None) => Value::NullBulkString
+                    };
+
+                    println!("Master Sending value {:?}", response);
+                    handler.write_value(response).await.unwrap();
+
                 }
                 "set" => {
                     let key = unpack_bulk_str(args.first().unwrap().clone()).unwrap();
                     let value = unpack_bulk_str(args.get(1).unwrap().clone()).unwrap();
 
 
-                    match args.get(2) {
+                    let response = match args.get(2) {
                         Some(Value::BulkString(sub_cmd)) if sub_cmd.as_str().to_ascii_lowercase() == "px" => {
                             if let None = args.get(3) {
                                 println!("not got expiration");
@@ -325,46 +337,67 @@ async fn handle_conn(stream: TcpStream, db: &Arc<Database>, srv: &Arc<RwLock<Ser
                             Value::SimpleString("OK".to_string())
                         }
 
-                    }
+                    };
+
+                    println!("Master Sending value {:?}", response);
+                    handler.write_value(response).await.unwrap();
 
 
                 }
                 "info" => {
 
+                    let mut response = Value::NullBulkString;
                     if let Some(command_value) = args.first() {
                         let command_str = unpack_bulk_str(command_value.clone()).unwrap();
 
                         if command_str.to_lowercase() == "replication" {
 
-                            Value::BulkString(format!("role:{}\nmaster_replid:{}\nmaster_repl_offset:{}",
+                            response = Value::BulkString(format!("role:{}\nmaster_replid:{}\nmaster_repl_offset:{}",
                                                       srv.read().unwrap().role.to_string(),
                                                       srv.read().unwrap().master_replid,
                                                       srv.read().unwrap().master_repl_offset
                             ))
-                        } else {
-                            Value::NullBulkString
                         }
 
-                    } else {
-                        Value::NullBulkString
                     }
+
+                    println!("Master Sending value {:?}", response);
+                    handler.write_value(response).await.unwrap();
 
                 }
                 "replconf" => {
-                    Value::SimpleString("OK".to_string())
+                    let response = Value::SimpleString("OK".to_string());
+                    println!("Master Sending value {:?}", response);
+                    handler.write_value(response).await.unwrap();
                 }
                 "psync" => {
-                    Value::SimpleString(format!("+FULLRESYNC {} 0", srv.read().unwrap().master_replid))
+                    let response = Value::SimpleString(format!("+FULLRESYNC {} 0", srv.read().unwrap().master_replid));
+                    println!("Master Sending value {:?}", response);
+                    handler.write_value(response).await.unwrap();
+
+
+                    // SEND THE RDB FILE
+                    let empty_rdb_hex = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
+
+                    let empty_rdb_bytes = hex::decode(empty_rdb_hex)?;
+                    let empty_rdb_str = String::from_utf8(empty_rdb_bytes)?;
+
+                    let message = format!("${}\r\n{}", empty_rdb_bytes.len(), empty_rdb_str);
+                    handler.write_value(Value::RawString(message)).await.unwrap();
+
                 }
                 c => panic!("Unsupported command: {}", c)
             }
         } else {
             println!("Master Received null value");
-           break;
+            break;
         };
 
-        println!("Master Sending value {:?}", response);
-        handler.write_value(response).await.unwrap();
+
+
+
+
+
     }
 
 }
