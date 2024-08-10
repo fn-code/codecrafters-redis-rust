@@ -30,8 +30,10 @@ impl Psync {
 
                     match rdb {
                         Ok(rdb) => {
-                            let msg =  format!("${}\r\n{}", rdb.len(), rdb_str);
+                            println!("--------------- sending RDB len: {}", rdb.len());
+                            let msg =  format!("${}\r\n", rdb.len());
                             let mut message_bytes = BytesMut::from(msg.as_bytes());
+                            message_bytes.extend_from_slice(&rdb);
 
                             conn.write(&message_bytes).await?;
                             println!("--------------- sent RDB");
