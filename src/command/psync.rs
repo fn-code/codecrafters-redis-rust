@@ -20,11 +20,11 @@ impl Psync {
 
     pub(crate) async fn execute(&self, conn: &mut Connnection, repl: &Replication) -> Result<(), Error> {
         match (self.args.get(0), self.args.get(1)) {
-            (Some(a), Some(b)) if a.get_string() == Some(String::from("?")) && b.get_string() == Some(String::from("-1")) => {
-
-                let resp_value = Value::SimpleString(format!("FULLRESYNC {} 0", repl.master_replid));
-                conn.write_value(resp_value).await?;
-
+            (Some(a), Some(b)) => {
+                if a.get_string() == Some(String::from("?")) && b.get_string() == Some(String::from("-1")) {
+                    let resp_value = Value::SimpleString(format!("FULLRESYNC {} 0", repl.master_replid));
+                    conn.write_value(resp_value).await?;
+                }
             }
             _ => {}
         }
