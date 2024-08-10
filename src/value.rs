@@ -35,10 +35,10 @@ impl Value {
         }
     }
 
-    pub fn get_string(&self) -> Option<&str> {
+    pub fn get_string(&self) -> Option<String> {
         match self {
-            Value::SimpleString(s) => Some(s),
-            Value::BulkString(s) => Some(s),
+            Value::SimpleString(s) => Some(s.clone()),
+            Value::BulkString(s) => Some(s.clone()),
             _ => None,
         }
     }
