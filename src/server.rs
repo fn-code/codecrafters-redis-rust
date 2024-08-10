@@ -59,6 +59,10 @@ where
                 break Err(Error::msg("Failed to read value"));
             };
 
+            if value == Value::NullBulkString {
+                break Ok(());
+            }
+
             println!("Received value {:?}", value);
 
             let cmd = Command::parse(value);

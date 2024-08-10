@@ -30,7 +30,7 @@ impl Command {
     pub(crate) fn parse(value: Value) -> Self {
         let (cmd, args) = Value::parse_command(value).unwrap_or_default();
 
-        match cmd.as_str() {
+        match cmd.to_lowercase().as_str() {
             "ping" => Command::Ping(Ping::new()),
             "echo" => Command::Echo(Echo::new(args)),
             "get" => Get::new(args).map_or(Command::Unknown, Command::Get),
