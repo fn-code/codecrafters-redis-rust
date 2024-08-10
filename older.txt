@@ -1,0 +1,316 @@
+// async fn run_server(db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
+//
+//     let srv_read = srv.read().unwrap();
+//
+//     // if the app role is slave, connect to the master
+//     if srv_read.role == ServerRole::Slave {
+//         println!("Trying to connect to master node {}:{}", srv_read.master_host, srv_read.master_port);
+//         connect_to_master(srv).await;
+//     }
+//
+//     println!("Trying Listening on {}:{}",srv_read.host, srv_read.port);
+//     let listener = TcpListener::bind(format!("{}:{}",srv_read.host, srv_read.port)).await.unwrap();
+//     loop {
+//         let stream = listener.accept().await;
+//         let db = Arc::clone(db);
+//         let srv = Arc::clone(srv);
+//
+//
+//         match stream {
+//             Ok((stream, _)) => {
+//
+//                 let mut conn = Connnection::new(stream);
+//
+//                 println!("accepted new connection");
+//                 tokio::spawn(async move {
+//                     handle_connection(conn, &db, &srv).await;
+//                 });
+//             }
+//             Err(e) => {
+//                 println!("error: {}", e);
+//             }
+//         }
+//     }
+// }
+
+
+// async fn connect_to_master(server: &Arc<RwLock<Server>>)   {
+//
+//     let srv_read = server.read().unwrap();
+//     println!("Connecting to master at {}:{}", srv_read.master_host,srv_read.master_port);
+//     let ip4_addr = SocketAddr::from_str(format!("{}:{}",srv_read.master_host,srv_read.master_port).as_str()).unwrap();
+//     let stream  = TcpStream::connect(ip4_addr).await.unwrap();
+//
+//
+//     let conn = Connnection::new(stream);
+//     handle_slave_con(conn, &server).await;
+// }
+
+// async fn handle_slave_con(mut conn: Connnection, server: &Arc<RwLock<Server>>) {
+//     let srv_read = server.read().unwrap();
+//
+//
+//
+//     conn.write_value(Value::Array(vec![
+//         Value::BulkString("ping".to_string()),
+//     ])).await.unwrap();
+//
+//     // let resp = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
+//     let resp = conn.read_value().await.unwrap();
+//
+//     match resp {
+//         Some(value) => {
+//             let (command, _ ) = extract_command(value).unwrap();
+//             if command.to_lowercase() != "pong" {
+//                 println!("Slave did not receive pong from master");
+//                 return;
+//             }
+//
+//             println!("Slave received pong from master")
+//         }
+//         None => {
+//             println!("Slave received null value, should got pong");
+//             return;
+//         }
+//     };
+//
+//     let port_conf = Value::Array(vec![
+//         Value::BulkString("replconf".to_string()),
+//         Value::BulkString("listening-port".to_string()),
+//         Value::BulkString(srv_read.port.to_string()),
+//     ]);
+//
+//
+//     conn.write_value(port_conf).await.unwrap();
+//
+//     // let resp_conf_port = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
+//     let resp_conf_port = handler.read_value().await.unwrap();
+//
+//
+//     match resp_conf_port {
+//         Some(value) => {
+//             let (command, _ ) = extract_command(value).unwrap();
+//             if command.to_lowercase() != "ok" {
+//                 println!("Slave did not receive ok from master");
+//                 return;
+//             }
+//
+//             println!("Slave received ok from master")
+//         }
+//         None => {
+//             println!("Slave received null value should got ok");
+//             return;
+//         }
+//     };
+//
+//     let capa_conf = Value::Array(vec![
+//         Value::BulkString("replconf".to_string()),
+//         Value::BulkString("capa".to_string()),
+//         Value::BulkString("psync2".to_string()),
+//     ]);
+//
+//     conn.write_value(capa_conf).await.unwrap();
+//
+//     // let resp_conf_capa = timeout(time::Duration::from_secs(10), handler.read_value()).await.unwrap().unwrap();
+//     let resp_conf_capa = conn.read_value().await.unwrap();
+//
+//     match resp_conf_capa {
+//         Some(value) => {
+//             let (command, _ ) = extract_command(value).unwrap();
+//             if command.to_lowercase() != "ok" {
+//                 println!("Slave did not receive ok from master");
+//                 return;
+//             }
+//
+//             println!("Slave received ok from master")
+//         }
+//         None => {
+//             println!("Slave received null value should got ok");
+//             return;
+//         }
+//     };
+//
+//     let psync_conf = Value::Array(vec![
+//         Value::BulkString("psync".to_string()),
+//         Value::BulkString("?".to_string()),
+//         Value::BulkString("-1".to_string()),
+//     ]);
+//
+//     conn.write_value(psync_conf).await.unwrap();
+//     let resp_conf_psync = timeout(time::Duration::from_secs(10), conn.read_value())
+//         .await
+//         .unwrap()
+//         .unwrap();
+//
+//     match resp_conf_psync {
+//         Some(value) => {
+//             let (command, _ ) = extract_command(value).unwrap();
+//             println!("Slave received {} from master", command);
+//         }
+//         None => {
+//             println!("Slave received null value should got ok");
+//             return;
+//         }
+//     };
+//
+//
+// }
+
+
+// *2\r\n$4\r\necho\r\n$3\r\nhey\r\n
+// async fn handle_connection(mut conn: Connnection, db: &Arc<Database>, srv: &Arc<RwLock<Server>>) {
+
+
+
+    // loop {
+    //     let mut value = conn.read_value().await.unwrap();
+    //
+    //     if value.is_none() {
+    //         println!("Master Received null value");
+    //         break;
+    //     }
+    //
+    //     println!("Master Got value: {:?}", value);
+    //
+    //     if let Some(value) = value {
+    //         let (command, args) = extract_command(value).unwrap();
+    //         match command.to_lowercase().as_str() {
+    //             "ping" => {
+    //                 let response = Value::SimpleString("PONG".to_string());
+    //
+    //                 println!("Master Sending value {:?}", response);
+    //                 conn.write_value(response).await.unwrap();
+    //             },
+    //             "echo" => {
+    //                 let response = args.first().unwrap().clone();
+    //                 println!("Master Sending value {:?}", response);
+    //                 conn.write_value(response).await.unwrap();
+    //             },
+    //             "get" => {
+    //                 let key = unpack_bulk_str(args.first().unwrap().clone()).unwrap();
+    //                 let response = match db.get(key.as_str()) {
+    //                     Some(value) => Value::BulkString(value),
+    //                     None => Value::NullBulkString
+    //                 };
+    //
+    //                 println!("Master Sending value {:?}", response);
+    //                 conn.write_value(response).await.unwrap();
+    //
+    //             }
+    //             "set" => {
+    //                 let key = unpack_bulk_str(args.first().unwrap().clone()).unwrap();
+    //                 let value = unpack_bulk_str(args.get(1).unwrap().clone()).unwrap();
+    //
+    //
+    //                 let response = match args.get(2) {
+    //                     Some(Value::BulkString(sub_cmd)) if sub_cmd.as_str().to_ascii_lowercase() == "px" => {
+    //                         if let None = args.get(3) {
+    //                             println!("not got expiration");
+    //                             Value::NullBulkString
+    //                         } else {
+    //                             let expiration = match args.get(3).unwrap() {
+    //                                 Value::BulkString(s) => s.parse::<i64>().unwrap(),
+    //                                 _ => panic!("Invalid expiration")
+    //                             };
+    //
+    //                             db.set(key, value, Some(expiration));
+    //                             Value::SimpleString("OK".to_string())
+    //                         }
+    //
+    //                     },
+    //                     _ => {
+    //                        db.set(key, value, None);
+    //                         Value::SimpleString("OK".to_string())
+    //                     }
+    //
+    //                 };
+    //
+    //                 println!("Master Sending value {:?}", response);
+    //                 conn.write_value(response).await.unwrap();
+    //
+    //             }
+    //             "info" => {
+    //                 let mut response = Value::NullBulkString;
+    //                 if let Some(command_value) = args.first() {
+    //                     let command_str = unpack_bulk_str(command_value.clone()).unwrap();
+    //
+    //                     if command_str.to_lowercase() == "replication" {
+    //
+    //                         response = Value::BulkString(format!("role:{}\nmaster_replid:{}\nmaster_repl_offset:{}",
+    //                                                   srv.read().unwrap().role.to_string(),
+    //                                                   srv.read().unwrap().master_replid,
+    //                                                   srv.read().unwrap().master_repl_offset
+    //                         ))
+    //                     }
+    //
+    //                 }
+    //
+    //                 println!("Master Sending value {:?}", response);
+    //                 conn.write_value(response).await.unwrap();
+    //
+    //             }
+    //             "replconf" => {
+    //                 let response = Value::SimpleString("OK".to_string());
+    //                 println!("Master Sending value {:?}", response);
+    //                 conn.write_value(response).await.unwrap();
+    //             }
+    //             "psync" => {
+    //                 let response = Value::SimpleString(format!("+FULLRESYNC {} 0", srv.read().unwrap().master_replid));
+    //                 println!("Master Sending value {:?}", response);
+    //                 conn.write_value(response).await.unwrap();
+    //
+    //
+    //                 // SEND THE RDB FILE
+    //                 let empty_rdb_hex = "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
+    //                 let empty_rdb_bytes = hex::decode(empty_rdb_hex).unwrap();
+    //
+    //                 let msg =  format!("${}\r\n", empty_rdb_bytes.len());
+    //                 let mut message_bytes = BytesMut::from(msg.as_bytes());
+    //                 message_bytes.extend(empty_rdb_bytes);
+    //
+    //                 println!("Master Sending value RDB");
+    //
+    //                 conn.write(&message_bytes).await.unwrap();
+    //
+    //                 let write_srv = srv.try_write().unwrap();
+    //
+    //                 write_srv.slaves
+    //                     .lock()
+    //                     // .expect("slaves map lock failed")
+    //                     .unwrap()
+    //                     .insert(stream.peer_addr().expect("Get remote addr failed"), handler.clone());
+    //
+    //
+    //             }
+    //             c => panic!("Unsupported command: {}", c)
+    //         }
+    //     } else {
+    //         println!("Master Received null value");
+    //         break;
+    //     };
+    //
+    // }
+
+// }
+
+// fn extract_command(value: Value) -> Result<(String, Vec<Value>)> {
+//     match value {
+//         Value::Array(a) => {
+//             Ok((
+//                 unpack_bulk_str(a.first().unwrap().clone())?,
+//                 a.into_iter().skip(1).collect(),
+//                 ))
+//         }
+//         Value::SimpleString(s) => {
+//             Ok((s, vec![]))
+//         }
+//         _ => Err(anyhow::anyhow!("Not an array"))
+//     }
+// }
+//
+// fn unpack_bulk_str(value: Value) -> Result<String> {
+//     match value {
+//         Value::BulkString(s) => Ok(s),
+//         _ => Err(anyhow::anyhow!("Not a bulk string"))
+//     }
+// }

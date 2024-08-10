@@ -1,66 +1,40 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use bytes::BytesMut;
-use anyhow::Result;
+use anyhow::{Error, Result};
+use crate::value::Value;
 
-#[derive(Clone, Debug)]
-
-pub enum Value {
-    SimpleString(String),
-    BulkString(String),
-    Array(Vec<Value>),
-    NullBulkString,
-}
-
-impl Value {
-    pub fn serialize(self) -> String {
-        match self {
-            Value::SimpleString(s) => format!("+{}\r\n", s),
-            Value::BulkString(s) => format!("${}\r\n{}\r\n", s.len(), s),
-            Value::NullBulkString => "$-1\r\n".to_string(),
-            Value::Array(v) => {
-                let mut serialized = format!("*{}\r\n", v.len());
-                for item in v {
-                    serialized.push_str(&item.serialize());
-                }
-                serialized
-            }
-        }
-    }
-}
-
-pub struct RespHandler {
+#[derive(Debug)]
+pub struct Connnection {
     stream: TcpStream,
     buffer: BytesMut
 }
 
-impl RespHandler {
+impl Connnection {
     pub fn new(stream: TcpStream) -> Self {
-        return RespHandler {
-            stream: stream,
+        return Connnection {
+            stream,
             buffer: BytesMut::with_capacity(1024)
         }
     }
 
-    pub async fn read_value(&mut self) -> Result<Option<Value>> {
+    pub async fn read_value(&mut self) -> Result<Value, Error> {
         let bytes_read = self.stream.read_buf(&mut self.buffer).await?;
-
         if bytes_read == 0 {
-            return Ok(None);
+            return Ok(Value::NullBulkString);
         }
 
         let (v, _) = parse_message(self.buffer.split())?;
-        Ok(Some(v))
-
+        Ok(v)
     }
 
-    pub async fn write_value(&mut self, value: Value) -> Result<()> {
+    pub async fn write_value(&mut self, value: Value) -> Result<(), Error> {
         self.stream.write(value.serialize().as_bytes()).await?;
         Ok(())
     }
 
     pub async fn write(&mut self,  buffer: &[u8]) -> Result<()> {
-        self.stream.write(&buffer).await?;
+        self.stream.write(buffer).await?;
         Ok(())
     }
 }
